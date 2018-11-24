@@ -66,7 +66,7 @@ if (!skipAutoconf) {
         }
       },
       worker: {
-        concurency: 
+        concurency: 100
       }
     }
   };
