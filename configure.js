@@ -113,7 +113,7 @@ if (!skipAutoconf) {
         type: 'input',
         name: 'default_worker_concurency',
         message: "concurency for default worker",
-        default: defaultConf.default.queue.redis.db,
+        default: defaultConf.default.worker.concurency,
         validate: function(value) {
           return true;
         }
