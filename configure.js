@@ -106,7 +106,7 @@ if (!skipAutoconf) {
         message: "redis database id for default queue",
         default: defaultConf.default.queue.redis.db,
         validate: function(value) {
-          return true;
+          return ~~(value) >= 0;
         }
       },
       {
@@ -115,7 +115,7 @@ if (!skipAutoconf) {
         message: "concurency for default worker",
         default: defaultConf.default.worker.concurency,
         validate: function(value) {
-          return true;
+          return ~~(value) > 0;
         }
       }
     ];
