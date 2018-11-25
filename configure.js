@@ -130,12 +130,12 @@ if (!skipAutoconf) {
           queue: {
             redis: {
               host: conf.default_queue_redis_host,
-              port: conf.default_queue_redis_port,
-              db: conf.default_queue_redis_db
+              port: ~~(conf.default_queue_redis_port),
+              db: ~~(conf.default_queue_redis_db)
             }
           },
           worker: {
-            concurency: conf.default_worker_concurency
+            concurency: ~~(conf.default_worker_concurency)
           }
         }
       });
