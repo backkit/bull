@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const inquirer = require('inquirer');
 const yaml = require('js-yaml');
+const beautifyjs = require('js-beautify').js;
 
 const skipPrompt = process.env.NO_INTERACTIVE || process.env.NO_PROMPT ? true : false;
 const skipAutoconf = process.env.NO_AUTOCONF ? true : false;
@@ -45,9 +46,12 @@ const generate = (serviceName, moduleName, config) => {
   if (!fs.existsSync(resourceDir)) {
     fs.mkdirSync(resourceDir, {recursive: true});
     for (let queueName in config) {
-      fs.writeFileSync(`${resourceDir}/${queueName}.js`, `module.exports = ({bull}) => bull.worker('${queueName}', (job) => {
-        return Promise.resolve(true);
-      });`);
+      fs.writeFileSync(`${resourceDir}/${queueName}.js`,
+        beautifyjs(`
+        module.exports = ({bull}) => bull.worker('${queueName}', (job) => {
+          return Promise.resolve(true);
+        });`,
+        { indent_size: 2 }));
     }
   }
 };
