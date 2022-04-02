@@ -6,7 +6,7 @@ Backkit service for [bull](https://github.com/OptimalBits/bull), redis based job
 # install
 
 ```
-npm install --save git+https://github.com/backkit/bull.git
+npm install --save @backkit/bull
 ```
 
 # configuration example
