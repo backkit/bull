@@ -4,12 +4,12 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "@backkit/autoconf": "^0.1.1",
     "bull": "^3.5.2",
     "inquirer": "^6.2.0",
     "js-beautify": "^1.8.8",
     "js-yaml": "^3.14.1"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "exit 0",
     "postinstall": "node configure.js",
