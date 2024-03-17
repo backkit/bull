@@ -35,10 +35,30 @@ class BullService {
     const bullConfig = this.config.get('bull');
     const _queueConfig = (bullConfig[name] || {}).queue || {};
     const queueConfig = {
+      options: {}
+    };
+    _queueConfig.options = _queueConfig.options || {};
+    _queueConfig.redis = _queueConfig.redis || {};
+
+    /*
+      Redis prefix
+      queue.options.prefix
+
+      ===
+    */
+    if (_queueConfig.options.prefix) {
       // redis prefix
-      prefix: 'bull',
-      /*
-      // worker rate limit
+      queueConfig.options.prefix = _queueConfig.options.prefix;
+    } else {
+      queueConfig.options.prefix = 'bull';
+    }
+
+    /*
+      Worker rate limit
+      queue.options.limiter
+
+      ===
+
       limiter: {
         // Max number of jobs processed
         max: 10000,
@@ -47,23 +67,75 @@ class BullService {
         // When jobs get rate limited, they stay in the waiting queue and are not moved to the delayed queue
         bounceBack: false
       },
-      */
-      // redis connection
+    */
+    if (_queueConfig.options.limiter) {
+      queueConfig.options.limiter = _queueConfig.options.limiter;
+    }
+
+    
+    /*
+      Redis connection
+      queue.redis
+
+      @see https://github.com/redis/ioredis?tab=readme-ov-file#connect-to-redis
+    
+      ===
+
+      redis: rediss://...
+
+      OR
+
       redis: {
-        host: _queueConfig.redis && _queueConfig.redis.host ? _queueConfig.redis.host : '127.0.0.1',
-        port: _queueConfig.redis && _queueConfig.redis.port ? _queueConfig.redis.port : 6379,
-        db: _queueConfig.redis && _queueConfig.redis.db ? _queueConfig.redis.db : 0,
-        // password
-        options: {
-        },
-        retry_strategy: function(options) {
-          const {attempt, total_retry_time, error, times_connected} = options;
-          console.log(`redis retry strategy: attempt #${attempt}, time spent to reconnect: ${total_retry_time}, connected ${times_connected} times, err ${error?error.message:''}`);
-          return 5000;
-        }
-      },
-      /*
-      // advanced queue settings
+        host: ...,
+        port: ...,
+        db: ...,
+        password: ...,
+      }
+
+      !!! In case you use a connection string, you have to set queue.options.redis.tls = {} to avoid ECONNRESET
+      !!! https://github.com/OptimalBits/bull/issues/1464#issuecomment-532700395
+      !!! https://github.com/redis/ioredis/blob/f68290e/lib/redis/RedisOptions.ts#L184
+    */
+    if (_queueConfig.redis) {
+      // redis connection string url OR socket file (ex: /tmp/redis.sock)
+      if (typeof(_queueConfig.redis) === 'string') {
+        queueConfig.redis = _queueConfig.redis;
+      }
+      // fallback to host|port|db|password format for compatibility reasons
+      else if (typeof(_queueConfig.redis) === 'object') {
+        queueConfig.redis = {redis: _queueConfig.redis};
+        // ensre there is at least host/port
+        queueConfig.redis.redis.host = queueConfig.redis.redis.host || '127.0.0.1';
+        queueConfig.redis.redis.port = queueConfig.redis.redis.port || 6379;
+      }
+      // simple port format (see ioredis)
+      else if (typeof(_queueConfig.redis) === 'number' && Number.isInteger(_queueConfig.redis)) {
+        queueConfig.redis.redis.host = '127.0.0.1';
+        queueConfig.redis.redis.port = ~~(_queueConfig.redis);
+        queueConfig.redis.redis.db = 0;
+      }
+      else {
+        throw Error(`@backkit/bull: Bad queueConfig.redis config`);
+      }
+    } else {
+      throw Error(`@backkit/bull: Missing queueConfig.redis config`);
+    }
+
+    /*
+    // @todo https://github.com/redis/ioredis/blob/f68290e/lib/redis/RedisOptions.ts#L195C3-L195C16
+    queueConfig.redis.retryStrategy = function(options) {
+      const {attempt, total_retry_time, error, times_connected} = options;
+      console.log(`redis retry strategy: attempt #${attempt}, time spent to reconnect: ${total_retry_time}, connected ${times_connected} times, err ${error?error.message:''}`);
+      return 5000;
+    };
+    */
+
+    /*
+      Advanced queue settings
+      queue.options.settings
+
+      ===
+
       settings: {
         // Key expiration time for job locks.
         lockDuration: 30000,
@@ -80,9 +152,113 @@ class BullService {
         // A timeout for when the queue is in drained state (empty waiting for jobs).
         drainDelay: 5
       },
-      */
-      // default job options
-      /*
+    */
+    if (_queueConfig.options.settings && typeof(_queueConfig.options.settings) === 'object') {
+      queueConfig.options.settings = _queueConfig.options.settings;
+    }
+
+
+    /*
+      Metrics options
+      queue.options.metrics
+
+      metrics: {
+        maxDataPoints?: number; //  Max number of data points to collect, granularity is fixed at one minute.
+      }
+
+     */
+    if (_queueConfig.options.metrics && typeof(_queueConfig.options.metrics) === 'object') {
+      queueConfig.options.metrics = _queueConfig.options.metrics;
+    }
+
+
+    /*
+      Redis options  !!!!!!  Do not confuse it with the redis connection string/object located at queue.redis !!!!!!!!
+      queue.options.redis
+
+      Full list of options: https://github.com/redis/ioredis/blob/v4/API.md#new-redisport-host-options
+
+      redis: {
+        // Port of the Redis server, or a URL string, or the options object.
+        port: 6379,
+        // Host of the Redis server, when the first argument is a URL string, this argument is an object represents the options.
+        host: "localhost",
+        // Other options.
+        options: {
+            // Port of the Redis server.
+            port: 6379,
+            // Host of the Redis server.
+            host: "localhost",
+            // Version of IP stack. Defaults to 4.
+            family: 4,
+            // Local domain socket path. If set the port, host and family will be ignored.
+            path: null,
+            // TCP KeepAlive on the socket with a X ms delay before start. Set to a non-number value to disable keepAlive.
+            keepAlive: 0,
+            // Whether to disable the Nagle's Algorithm. By default we disable it to reduce the latency.
+            noDelay: true,
+            // Connection name.
+            connectionName: null,
+            // Database index to use.
+            db: 0,
+            // If set, client will send AUTH command with the value of this option when connected.
+            password: null,
+            // Similar to password. Provide this for Redis ACL support.
+            username: null,
+            // Drop the buffer support for better performance. This option is recommended to be enabled when handling large array response and you don't need the buffer support.
+            dropBufferSupport: false,
+            // When a connection is established to the Redis server, the server might still be loading the database from disk. While loading, the server not respond to any commands. To work around this, when this option is true, ioredis will check the status of the Redis server, and when the Redis server is able to process commands, a ready event will be emitted.
+            enableReadyCheck: true,
+            // By default, if there is no active connection to the Redis server, commands are added to a queue and are executed once the connection is "ready" (when enableReadyCheck is true, "ready" means the Redis server has loaded the database from disk, otherwise means the connection to the Redis server has been established). If this option is false, when execute the command when the connection isn't ready, an error will be returned.
+            enableOfflineQueue: true,
+            // The milliseconds before a timeout occurs during the initial connection to the Redis server.
+            connectTimeout: 10000,
+            // The milliseconds before socket.destroy() is called after socket.end() if the connection remains half-open during disconnection.
+            disconnectTimeout: 2000,
+            // The milliseconds before a timeout occurs when executing a single command. By default, there is no timeout and the client will wait indefinitely. The timeout is enforced only on the client side, not server side. The server may still complete the operation after a timeout error occurs on the client side.
+            commandTimeout: undefined,
+            // After reconnected, if the previous connection was in the subscriber mode, client will auto re-subscribe these channels.
+            autoResubscribe: true,
+            // If true, client will resend unfulfilled commands(e.g. block commands) in the previous connection when reconnected.
+            autoResendUnfulfilledCommands: true,
+            // By default, When a new Redis instance is created, it will connect to Redis server automatically. If you want to keep the instance disconnected until a command is called, you can pass the lazyConnect option to the constructor.
+            lazyConnect: false,
+            // TLS connection support. See https://github.com/luin/ioredis#tls-options
+            tls: {},
+            // The prefix to prepend to all keys in a command.
+            keyPrefix: "",
+            // See "Quick Start" section.
+            retryStrategy: undefined,
+            // See "Quick Start" section.
+            maxRetriesPerRequest: undefined,
+            // See "Quick Start" section.
+            reconnectOnError: undefined,
+            // Enable READONLY mode for the connection. Only available for cluster mode.
+            readOnly: false,
+            // Force numbers to be always returned as JavaScript strings. This option is necessary when dealing with big numbers (exceed the [-2^53, +2^53] range).
+            stringNumbers: false,
+            // When enabled, all commands issued during an event loop iteration are automatically wrapped in a pipeline and sent to the server at the same time. This can improve performance by 30-50%.
+            enableAutoPipelining: false,
+            // The list of commands which must not be automatically wrapped in pipelines.
+            autoPipeliningIgnoredCommands: [],
+            // Default script definition caching time.
+            maxScriptsCachingTime: 60000
+        }
+      }
+
+     */
+    if (_queueConfig.options.redis && typeof(_queueConfig.options.redis) === 'object') {
+      queueConfig.options.redis = _queueConfig.options.redis;
+    }
+
+
+
+    /*
+      Default job options
+      queue.options.defaultJobOptions
+
+      ===
+
       defaultJobOptions: {
         // Optional priority value. ranges from 1 (highest priority) to MAX_INT  (lowest priority). Note that
         // using priorities has a slight impact on performance, so do not use it if not required.
@@ -138,8 +314,11 @@ class BullService {
         // Limits the amount of stack trace lines that will be recorded in the stacktrace.
         stackTraceLimit: 1000
       }
-      */
-    };
+    */
+    if (_queueConfig.options.defaultJobOptions && typeof(_queueConfig.options.defaultJobOptions) === 'object') {
+      queueConfig.options.defaultJobOptions = _queueConfig.options.defaultJobOptions;
+    }
+
     return queueConfig;
   }
 
@@ -150,8 +329,8 @@ class BullService {
    * @return {Object}
    */
   getWorkerConfig(name) {
-    const beeConfig = this.config.get('bull');
-    const _workerConfig = (beeConfig[name] || {}).worker || {};
+    const bullConfig = this.config.get('bull');
+    const _workerConfig = (bullConfig[name] || {}).worker || {};
     const workerConfig = {
       concurency: _workerConfig.concurency || 10
     };
@@ -161,13 +340,19 @@ class BullService {
   /**
    * Returns a bull queue by name
    *
+   * @see fix for "error: read ECONNRESET" when using connection string "rediss://..."
+   *      https://github.com/OptimalBits/bull/issues/1464#issuecomment-532700395
+   *      we have to set options, 3rd bull queue argument: {redis: tls: {}}
+   * 
+   * @see https://github.com/OptimalBits/bull/blob/develop/REFERENCE.md#queue
+   * @see https://github.com/OptimalBits/bull/blob/develop/lib/queue.js
+   * 
    * @param {String} name
    * @return {Object}
    */
   getQueue(name) {
     const queueConfig = this.getQueueConfig(name);
-    const queue = new bull(name, queueConfig);
-    return queue;
+    return new bull(name, queueConfig.redis, queueConfig.options);
   }
 
   /**
@@ -203,7 +388,7 @@ class BullService {
 
     // job events
     .on('waiting', (jobId) => {
-      this.logger.info(`Queue ${name}, job #${jobId} waiting`);
+      //this.logger.info(`Queue ${name}, job #${jobId} waiting`);
     })
 
     .on('active', (job, jobPromise) => {
@@ -239,7 +424,7 @@ class BullService {
       .catch(err => {
         this.logger.info(`Queue ${name}, healthcheck failed`);
       })
-    }, 5000);
+    }, 30*1000);
 
     queue.process(workerConfig.concurency, this.queueProcessors[name]);
     return this;

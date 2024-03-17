@@ -100,17 +100,69 @@ autoconf('bull')
     validate: function(value) {
       return ~~(value) > 0;
     }
-  }
+  },
+  {
+    if: {
+      fileNotFound: self.serviceConfigMainYML
+    },
+    type: 'confirm',
+    name: 'default_redis_secure',
+    message: "is it a secure connection",
+    default: false,
+    validate: function(value) {
+      return true;
+    }
+  },
+  {
+    if: {
+      fileNotFound: self.serviceConfigMainYML
+    },
+    type: 'input',
+    name: 'default_username',
+    message: "redis username or empty",
+    default: null,
+    validate: function(value) {
+      return true
+    }
+  },
+  {
+    if: {
+      fileNotFound: self.serviceConfigMainYML
+    },
+    type: 'input',
+    name: 'default_password',
+    message: "redis password or empty",
+    default: null,
+    validate: function(value) {
+      return true
+    }
+  },
 ]))
 .answersToConfig((self, answers) => {
   if (answers.default_queue_name) {
+    let proto = 'redis';
+    const host = answers.default_queue_redis_host;
+    const port = ~~(answers.default_queue_redis_port);
+    const db = ~~(answers.default_queue_redis_db);
+    const user = answers.default_username;
+    const pass = answers.default_password;
+    let redisOpts = {
+      connectTimeout: 5000
+    };
+    if (answers.default_redis_secure) {
+      proto = 'rediss';
+      redisOpts.tls = {};
+    }
+    let userpassmashup = '';
+    if (user && pass) userpassmashup = `${user}:${pass}@`;
+    else if (user) userpassmashup = `${user}@`;
+
     return {
       [answers.default_queue_name]: {
         queue: {
-          redis: {
-            host: answers.default_queue_redis_host,
-            port: ~~(answers.default_queue_redis_port),
-            db: ~~(answers.default_queue_redis_db)
+          redis: `${proto}://${userpassmashup}${host}:${port}/${db}`,
+          options: {
+            redis: redisOpts
           }
         },
         worker: {
